@@ -30,7 +30,11 @@ export const CargaExcel = () => {
 
   const handleLimpiar = () => {
     setFile(null);
+    setData([]);
+    setTableError([]);
+    setTableOk([]);
   };
+
   const handleGrabarDatos = () => {
     setModalOpen({
       isInfo: false,
@@ -44,6 +48,7 @@ export const CargaExcel = () => {
   };
 
   const handleFileChange = (e) => {
+    handleLimpiar();
     const file = e.target.files[0];
 
     const extension = file.name.split(".")[1];
@@ -58,16 +63,16 @@ export const CargaExcel = () => {
       return;
     }
 
-    setFile(file);
-
     /**Se obtiene archivo Excel --------------------------------*/
     readXlsxFile(file).then((data) => {
       setData(data);
       if (!validaColumnas(data[0])) {
         return;
+      } else {
+        setFile(file);
+        // Construcción de dos tablas, Datos Correctos y Errores, para ser desplegadas.
+        tablesBuild(data);
       }
-      // Construcción de dos tablas, Datos Correctos y Errores, para ser desplegadas.
-      tablesBuild(data);
     });
   };
   /** Fin se obtiene archivo Excel--------------------------------- */
@@ -106,7 +111,7 @@ export const CargaExcel = () => {
         };
         if (cell !== undefined && cell !== "" && cell !== null) {
           if (typeof cell !== dataTypes[j]) {
-            auxObject.mensaje = `En ${headersPatron[j]}, tipo de dato no coindide.`;
+            auxObject.mensaje = `${headersPatron[j]} inválido.`;
             auxObject.error = true;
             flagOk = false;
           }
@@ -175,7 +180,7 @@ export const CargaExcel = () => {
   // Valida que número de columnas de archivo de entrada es mayor o igual que el número de columnas patrón.
   const validaColumnas = (columns) => {
     if (columns.length < patron[0].length) {
-      setFile(null);
+      handleLimpiar();
       setModalOpen({
         isInfo: true,
         open: true,
@@ -188,6 +193,7 @@ export const CargaExcel = () => {
     patron[0].forEach((p) => {
       if (!columns.includes(p)) {
         aux = false;
+        handleLimpiar();
         setModalOpen({
           isInfo: true,
           open: true,
@@ -202,7 +208,7 @@ export const CargaExcel = () => {
 
   return (
     <>
-      <Box sx={{ paddingTop: 20, paddingLeft: 20, paddingRight: 20 }}>
+      <Box sx={{ paddingTop: 10, paddingLeft: 20, paddingRight: 20 }}>
         <hr />
         <Typography variant="h4" sx={{ marginTop: 5 }}>
           Demo Carga y previsualización de archivo Excel
@@ -224,19 +230,23 @@ export const CargaExcel = () => {
             onChange={handleFileChange}
           />
         </Button>
-        <Button
+        {/* <Button
           variant="outlined"
           sx={{ marginLeft: 2 }}
           onClick={handleLimpiar}
           component="label"
         >
           Limpiar
-        </Button>
+        </Button> */}
       </Box>
       {file && (
         <Box sx={{ paddingLeft: 20, paddingRight: 20, marginTop: 5 }}>
-          <Typography variant="body1">Nombre archivo: {file.name}</Typography>
-          <Typography variant="body1">Registros: {data.length - 1}</Typography>
+          <Typography variant="body1">
+            Nombre archivo: <b>{file.name}</b>
+          </Typography>
+          <Typography variant="body1">
+            Registros: <b>{data.length - 1}</b>
+          </Typography>
         </Box>
       )}
 
@@ -256,8 +266,16 @@ export const CargaExcel = () => {
                 onChange={handleChange}
                 aria-label="lab API tabs example"
               >
-                <Tab label="Correctos" value="1" />
-                <Tab label="Errores" sx={{ color: "red" }} value="2" />
+                {tableOK.length > 0 && (
+                  <Tab label={`Correctos (${tableOK.length})`} value="1" />
+                )}
+                {tableError.length > 0 && (
+                  <Tab
+                    label={`Errores (${tableError.length})`}
+                    sx={{ color: "red" }}
+                    value="2"
+                  />
+                )}
               </TabList>
             </Box>
             <TabPanel value="1">
@@ -269,7 +287,7 @@ export const CargaExcel = () => {
                     width: "100%",
                   }}
                 >
-                  <thead style={{ backgroundColor: "" }}>
+                  <thead style={{ backgroundColor: "#00cd46" }}>
                     <tr>
                       {patron[0].map((r, i) => (
                         <th
@@ -336,7 +354,93 @@ export const CargaExcel = () => {
                 </Button>
               </Box>
             </TabPanel>
-            <TabPanel value="2">Item Two</TabPanel>
+            <TabPanel value="2">
+              {tableError.length > 0 && (
+                <table
+                  style={{
+                    border: "solid",
+                    borderCollapse: "collapse",
+                    width: "100%",
+                  }}
+                >
+                  <thead style={{ backgroundColor: "#f1d93e" }}>
+                    <tr>
+                      {patron[0].map((r, i) => (
+                        <th
+                          style={{
+                            border: "solid",
+                            borderCollapse: "collapse",
+                          }}
+                          key={"head_" + i}
+                        >
+                          {r}
+                        </th>
+                      ))}
+                      <th>Error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableError.map((row, i) => (
+                      <tr key={"row_" + i}>
+                        {row.map((cell, j) => (
+                          <td
+                            style={{
+                              border: "solid",
+                              borderCollapse: "collapse",
+                              textAlign:
+                                patron[0][j] === "Edad" ||
+                                patron[0][j] === "Rut" ||
+                                patron[0][j] === "Fecha Nacimiento"
+                                  ? "center"
+                                  : "",
+                              backgroundColor: cell.error ? "#f8c1be" : "",
+                            }}
+                            key={"cell_" + j}
+                          >
+                            {typeof cell.value === "object" &&
+                            cell.value !== null
+                              ? new Date(cell.value)
+                                  .toISOString()
+                                  .split("T")[0]
+                                  .split("-")[2] +
+                                "-" +
+                                new Date(cell.value)
+                                  .toISOString()
+                                  .split("T")[0]
+                                  .split("-")[1] +
+                                "-" +
+                                new Date(cell.value)
+                                  .toISOString()
+                                  .split("T")[0]
+                                  .split("-")[0]
+                              : cell.value === null ||
+                                cell.value === undefined ||
+                                cell.value === ""
+                              ? ""
+                              : cell.value}
+                          </td>
+                        ))}
+                        <td
+                          style={{
+                            backgroundColor: "red",
+                            color: "white",
+                            border: "solid black",
+                            borderCollapse: "collapse",
+                          }}
+                        >
+                          {row.map(
+                            (cell, i) =>
+                              cell.error && (
+                                <div key={"msj_" + i}>-{cell.mensaje}</div>
+                              )
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </TabPanel>
           </TabContext>
         </Box>
       )}
